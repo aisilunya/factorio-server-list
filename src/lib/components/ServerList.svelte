@@ -1,7 +1,6 @@
 <script lang="ts">
     import DOMPurify from "isomorphic-dompurify";
     import InfiniteLoading from 'svelte-infinite-loading';
-    import { onMount } from 'svelte';
         
     let tableHeaders = [
         {"name": "Name"},
@@ -41,8 +40,6 @@
         const data = await response.json();
         allServers = await data.servers;
     }
-
-    onMount(() => fetchServers(url));
 
     $: servers = [
         ...servers,
