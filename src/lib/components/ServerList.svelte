@@ -1,21 +1,24 @@
 <script lang="ts">
     import DOMPurify from "isomorphic-dompurify";
-
-	export let allServers: Array<any>;
+    import InfiniteLoading from 'svelte-infinite-loading';
+    import { onMount } from 'svelte';
         
     let tableHeaders = [
-        "name",
-        "players",
-        "game_version",
-        "has_mods",
-        "has_password",
-        "game_time_elapsed"
+        {"name": "Name"},
+        {"players": "Players"},
+        {"game_version": "Game version"},
+        {"has_mods": "Mods"},
+        {"has_password": "Private"},
+        {"game_time_elapsed": "Game time elapsed"}
     ];
 
-    let servers: Array<any> = [];
-    let size = 100;
-    let page = 0;
+    let url = new URL('https://api.dservindex.com/servers?has_password=false&has_mods=any&game_version=any&orderby=players&direction=desc&search=')
 
+
+    let servers: Array<any> = [];
+    let allServers: Array<any> = [];
+    let size = 30;
+    let page = 0;
 
     
     function sanitize(rawString: any): string | any {
@@ -33,46 +36,75 @@
       return sanitizedString === '' ? rawString : sanitizedString
     };
 
-    $: servers = [
-    ...servers,
-    ...allServers.slice(size * page, size * (page + 1))
-  ];
+    async function fetchServers(url:URL): Promise<any> {
+        const response = await fetch(url)
+        const data = await response.json();
+        allServers = await data.servers;
+    }
 
+    onMount(() => fetchServers(url));
+
+    $: servers = [
+        ...servers,
+        ...allServers.slice(size * page, size * (page + 1))
+    ];
+
+  async function infiniteHandler({ detail: { loaded, complete }}: any): Promise<void> {
+    await fetchServers(url);
+    if (servers.length < allServers.length) {
+        page = page + 1;
+        servers = [
+        ...servers,
+        ...allServers.slice(size * page, size * (page + 1))
+        ];
+        loaded();
+    } else {
+        complete();
+    }
+	}
 </script>
 
-{#if allServers}
-    <table class="factorioTable">
-        <thead>
-            <tr>
-                {#each tableHeaders as header}
-				    <th><div class="factorioHeader">{header}</div></th>
-			    {/each}
-            <tr/>
-        </thead>
-        <tbody>
-            {#each Object.values(servers) as row}
+
+<div>
+    {#if allServers}
+        <table class="factorioTable">
+            <thead>
                 <tr>
                     {#each tableHeaders as header}
-                        {#each Object.entries(row) as [key, cell]}
-                        
-                            {#if header === key && !(key==='name')}
-                                <td>
-                                    <div class="factorioCell">{cell}</div>
-                                </td>
-                            {:else if header === key && key==='name'}
-                                <div class="factorioCell">{sanitize(cell)}</div>
-                            {/if}
-                        {/each}
+                        <th>
+                            <div class="factorioHeader">
+                                {Object.values(header)[0]}
+                            </div>
+                        </th>
                     {/each}
-                </tr>
-            {/each}
-        </tbody>
-    </table>
-{:else}
-	<p class="loading">loading...</p>
-{/if}
-
-
+                <tr/>
+            </thead>
+            <tbody>
+                {#each Object.values(servers) as row}
+                    <tr>
+                        {#each tableHeaders as header}
+                            {#each Object.entries(row) as [key, cell]}
+                                {#if Object.keys(header)[0] === key && !(key==='name')}
+                                    <td>
+                                        <div class="factorioCell">{cell}</div>
+                                    </td>
+                                {:else if Object.keys(header)[0] === key && key==='name'}
+                                    <div class="factorioCell">
+                                        {sanitize(cell)}
+                                    </div>
+                                {/if}
+                            {/each}
+                        {/each}
+                    </tr>
+                {/each}
+                <InfiniteLoading on:infinite={infiniteHandler} />
+            </tbody>
+            
+        </table>
+    {:else}
+        <p class="loading">loading...</p>
+    {/if}
+</div>
 
 
 <style>
@@ -115,7 +147,7 @@
         color: #000;
         font-weight: 600;
         vertical-align: baseline;
-        min-width: 150px;
+        min-width: 200px;
         display: inline-table;
         border: none;
         line-height: 36px;
@@ -146,5 +178,9 @@
     table.factorioTable tr {
         border: 5px ridge #313031;
         margin-top: 5px;
+    }
+    .factorioCell {
+        padding-left: 5px;
+        height: 100%;
     }
 </style>
